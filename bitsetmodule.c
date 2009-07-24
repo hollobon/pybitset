@@ -13,20 +13,6 @@ PyAPI_DATA(PyTypeObject) bitset_BitsetType;
 	(Py_TYPE(ob) == &bitset_BitsetType || \
 	PyType_IsSubtype(Py_TYPE(ob), &bitset_BitsetType))
 
-
-static PyObject *
-bitset_test(PyObject *self, PyObject *args)
-{
-    const char *command;
-
-    if (!PyArg_ParseTuple(args, "s", &command))
-        return NULL;
-
-    printf("bitset.test: %s\n", command);
-
-    return Py_BuildValue("i", 101);
-}
-
 typedef struct {
     PyObject_HEAD
     unsigned int bits;
@@ -45,7 +31,7 @@ Bitset_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
     self = (bitset_BitsetObject *)type->tp_alloc(type, 0);
     if (self != NULL) {
-        self->bits = 0x0000;
+        self->bits = 0U;
     }
 
     return (PyObject *)self;
@@ -191,8 +177,6 @@ bitset_contains(bitset_BitsetObject *bso, PyObject *key)
 }
 
 static PyMethodDef bitset_methods[] = {
-    {"test",  bitset_test, METH_VARARGS,
-     "Test function."},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 
@@ -394,56 +378,16 @@ bitset_Bitset_issubset(bitset_BitsetObject *so, PyObject *other)
 
 PyDoc_STRVAR(issubset_doc, "Report whether another set contains this set.");
 
-static PyMethodDef bitset_Bitset_methods[] = {
-	{"add",                         (PyCFunction)bitset_Bitset_add,
-     METH_O, add_doc},
-	{"clear",                       (PyCFunction)bitset_Bitset_clear,
-     METH_NOARGS, clear_doc},
-/* 	{"__contains__",                (PyCFunction)bitset_Bitset_direct_contains, */
-/*      METH_O | METH_COEXIST, contains_doc}, */
-	{"copy",                        (PyCFunction)bitset_Bitset_copy,
-     METH_NOARGS, copy_doc},
-	{"discard",                     (PyCFunction)bitset_Bitset_discard,
-     METH_O, discard_doc},
-/* 	{"difference",                  (PyCFunction)bitset_Bitset_difference_multi, */
-/*      METH_O, difference_doc}, */
-/* 	{"difference_update",           (PyCFunction)bitset_Bitset_difference_update, */
-/*      METH_O, difference_update_doc}, */
-/* 	{"intersection",                (PyCFunction)bitset_Bitset_intersection_multi, */
-/*      METH_O, intersection_doc}, */
-/* 	{"intersection_update",         (PyCFunction)bitset_Bitset_intersection_update_multi, */
-/*      METH_O, intersection_update_doc}, */
-/* 	{"isdisjoint",                  (PyCFunction)bitset_Bitset_isdisjoint, */
-/*      METH_O, isdisjoint_doc}, */
-	{"issubset",                    (PyCFunction)bitset_Bitset_issubset,
-     METH_O, issubset_doc},
-	{"issuperset",                  (PyCFunction)bitset_Bitset_issuperset,
-     METH_O, issuperset_doc},
-	{"pop",                         (PyCFunction)bitset_Bitset_pop,
-     METH_NOARGS, pop_doc},
-/* 	{"__reduce__",                  (PyCFunction)bitset_Bitset_reduce, */
-/*      METH_NOARGS, reduce_doc}, */
-	{"remove",                      (PyCFunction)bitset_Bitset_remove,
-     METH_O, remove_doc},
-/*     {"__sizeof__",                  (PyCFunction)bitset_Bitset_sizeof,                       */
-/*      METH_NOARGS, sizeof_doc}, */
-/* 	{"symmetric_difference",        (PyCFunction)bitset_Bitset_symmetric_difference,         */
-/*      METH_O, symmetric_difference_doc}, */
-/* 	{"symmetric_difference_update", (PyCFunction)bitset_Bitset_symmetric_difference_update,	 */
-/*      METH_O, symmetric_difference_update_doc}, */
-/* #ifdef Py_DEBUG */
-/* 	{"test_c_api",                  (PyCFunction)test_c_api,                                 */
-/*      METH_NOARGS, test_c_api_doc}, */
-/* #endif */
-/* 	{"union",                       (PyCFunction)bitset_Bitset_union,                        */
-/*      METH_VARARGS, union_doc}, */
-	{"update",                      (PyCFunction)bitset_Bitset_update,
-     METH_O, update_doc},
-	{NULL,		NULL}	            /* sentinel */
-};
+static PyObject *
+bitset_Bitset_isdisjoint(bitset_BitsetObject *bso, PyObject *other)
+{
+    if ((bso->bits & ((bitset_BitsetObject *)other)->bits) == 0)
+        Py_RETURN_TRUE;
+    Py_RETURN_FALSE;
+}
 
-PyDoc_STRVAR(difference_update_doc,
-"Remove all elements of another set from this set.");
+PyDoc_STRVAR(isdisjoint_doc,
+"Return True if two bitsets have a null intersection.");
 
 static PyObject *
 bitset_Bitset_difference(bitset_BitsetObject *so, PyObject *other)
@@ -460,9 +404,173 @@ bitset_Bitset_difference(bitset_BitsetObject *so, PyObject *other)
 }
 
 PyDoc_STRVAR(difference_doc,
-"Return the difference of two or more sets as a new set.\n\
+"Return the difference of two bitsets as a new bitset.\n\
 \n\
-(i.e. all elements that are in this set but not the others.)");
+(i.e. all elements that are in this bitset but not the other.)");
+
+static PyObject *
+bitset_Bitset_difference_update(bitset_BitsetObject *so, PyObject *other)
+{
+    so->bits &= (0xFFFF - ((bitset_BitsetObject *)other)->bits);
+
+    Py_RETURN_NONE;
+}
+
+PyDoc_STRVAR(difference_update_doc,
+"Remove all elements of another bitset from this bitset.");
+
+static PyObject *
+bitset_Bitset_symmetric_difference(bitset_BitsetObject *bso, PyObject *other)
+{
+	bitset_BitsetObject *result;
+
+	if (!bitset_Bitset_Check(bso) || !bitset_Bitset_Check(other)) {
+		Py_INCREF(Py_NotImplemented);
+		return Py_NotImplemented;
+	}
+
+	result = (bitset_BitsetObject *)bitset_Bitset_copy(bso);
+	if (result == NULL)
+		return NULL;
+
+
+    result->bits ^= ((bitset_BitsetObject *)other)->bits;
+
+	return (PyObject *)result;
+}
+
+PyDoc_STRVAR(symmetric_difference_doc,
+"Return the symmetric difference of two bitsets as a new bitset.\n\
+\n\
+(i.e. all elements that are in exactly one of the bitsets.)");
+
+static PyObject *
+bitset_Bitset_symmetric_difference_update(bitset_BitsetObject *bso, PyObject *other)
+{
+	if (!bitset_Bitset_Check(bso) || !bitset_Bitset_Check(other)) {
+		Py_INCREF(Py_NotImplemented);
+		return Py_NotImplemented;
+	}
+
+    bso->bits ^= ((bitset_BitsetObject *)other)->bits;
+
+	Py_RETURN_NONE;
+}
+
+PyDoc_STRVAR(symmetric_difference_update_doc,
+"Update a bitset with the symmetric difference of itself and another.");
+
+static PyObject *
+bitset_Bitset_union(bitset_BitsetObject *so, PyObject *other)
+{
+	bitset_BitsetObject *result;
+
+	if (!bitset_Bitset_Check(so) || !bitset_Bitset_Check(other)) {
+		Py_INCREF(Py_NotImplemented);
+		return Py_NotImplemented;
+	}
+
+	result = (bitset_BitsetObject *)bitset_Bitset_copy(so);
+	if (result == NULL)
+		return NULL;
+
+    result->bits |= ((bitset_BitsetObject *)other)->bits;
+
+	return (PyObject *)result;
+}
+
+PyDoc_STRVAR(union_doc,
+ "Return the union of two bitsets as a new bitset.\n\
+\n\
+(i.e. all elements that are in either bitset.)");
+
+static PyObject *
+bitset_Bitset_intersection(bitset_BitsetObject *so, PyObject *other)
+{
+	bitset_BitsetObject *result;
+
+	if (!bitset_Bitset_Check(so) || !bitset_Bitset_Check(other)) {
+		Py_INCREF(Py_NotImplemented);
+		return Py_NotImplemented;
+	}
+
+	result = (bitset_BitsetObject *)bitset_Bitset_copy(so);
+	if (result == NULL)
+		return NULL;
+
+    result->bits &= ((bitset_BitsetObject *)other)->bits;
+
+	return (PyObject *)result;
+}
+
+PyDoc_STRVAR(intersection_doc,
+"Return the intersection of two bitsets as a new bitset.\n\
+\n\
+(i.e. all elements that are in both bitsets.)");
+
+static PyObject *
+bitset_Bitset_intersection_update(bitset_BitsetObject *so, PyObject *other)
+{
+	if (!bitset_Bitset_Check(so) || !bitset_Bitset_Check(other)) {
+		Py_INCREF(Py_NotImplemented);
+		return Py_NotImplemented;
+	}
+
+    so->bits &= ((bitset_BitsetObject *)other)->bits;
+
+	Py_RETURN_NONE;
+}
+
+PyDoc_STRVAR(intersection_update_doc,
+"Update a bitset with the intersection of itself and another.");
+
+static PyMethodDef bitset_Bitset_methods[] = {
+	{"add",                         (PyCFunction)bitset_Bitset_add,
+     METH_O, add_doc},
+	{"clear",                       (PyCFunction)bitset_Bitset_clear,
+     METH_NOARGS, clear_doc},
+/* 	{"__contains__",                (PyCFunction)bitset_Bitset_direct_contains, */
+/*      METH_O | METH_COEXIST, contains_doc}, */
+	{"copy",                        (PyCFunction)bitset_Bitset_copy,
+     METH_NOARGS, copy_doc},
+	{"discard",                     (PyCFunction)bitset_Bitset_discard,
+     METH_O, discard_doc},
+	{"difference",                  (PyCFunction)bitset_Bitset_difference,
+     METH_O, difference_doc},
+	{"difference_update",           (PyCFunction)bitset_Bitset_difference_update,
+     METH_O, difference_update_doc}, /*  */
+	{"intersection",                (PyCFunction)bitset_Bitset_intersection,
+     METH_O, intersection_doc},
+	{"intersection_update",         (PyCFunction)bitset_Bitset_intersection_update,
+     METH_O, intersection_update_doc},
+	{"isdisjoint",                  (PyCFunction)bitset_Bitset_isdisjoint,
+     METH_O, isdisjoint_doc},
+	{"issubset",                    (PyCFunction)bitset_Bitset_issubset,
+     METH_O, issubset_doc},
+	{"issuperset",                  (PyCFunction)bitset_Bitset_issuperset,
+     METH_O, issuperset_doc},
+	{"pop",                         (PyCFunction)bitset_Bitset_pop,
+     METH_NOARGS, pop_doc},
+/* 	{"__reduce__",                  (PyCFunction)bitset_Bitset_reduce, */
+/*      METH_NOARGS, reduce_doc}, */
+	{"remove",                      (PyCFunction)bitset_Bitset_remove,
+     METH_O, remove_doc},
+/*     {"__sizeof__",                  (PyCFunction)bitset_Bitset_sizeof,                       */
+/*      METH_NOARGS, sizeof_doc}, */
+	{"symmetric_difference",        (PyCFunction)bitset_Bitset_symmetric_difference,
+     METH_O, symmetric_difference_doc},
+	{"symmetric_difference_update", (PyCFunction)bitset_Bitset_symmetric_difference_update,
+     METH_O, symmetric_difference_update_doc},
+/* #ifdef Py_DEBUG */
+/* 	{"test_c_api",                  (PyCFunction)test_c_api,                                 */
+/*      METH_NOARGS, test_c_api_doc}, */
+/* #endif */
+	{"union",                       (PyCFunction)bitset_Bitset_union,
+     METH_O, union_doc},
+	{"update",                      (PyCFunction)bitset_Bitset_update,
+     METH_O, update_doc},
+	{NULL,		NULL}	            /* sentinel */
+};
 
 static PyObject *
 bitset_Bitset_sub(bitset_BitsetObject *so, PyObject *other)
@@ -483,7 +591,7 @@ bitset_Bitset_isub(bitset_BitsetObject *so, PyObject *other)
 		return Py_NotImplemented;
 	}
     
-    so->bits &= (0xFFFF - ((bitset_BitsetObject *)other)->bits);
+    bitset_Bitset_difference_update(so, other);
     return (PyObject *)so;
 }
 
@@ -519,11 +627,6 @@ bitset_Bitset_iand(bitset_BitsetObject *so, PyObject *other)
     return (PyObject *)so;
 }
 
-PyDoc_STRVAR(symmetric_difference_doc,
-"Return the symmetric difference of two sets as a new set.\n\
-\n\
-(i.e. all elements that are in exactly one of the sets.)");
-
 static PyObject *
 bitset_Bitset_xor(bitset_BitsetObject *so, PyObject *other)
 {
@@ -555,11 +658,6 @@ bitset_Bitset_ixor(bitset_BitsetObject *so, PyObject *other)
 
 	return (PyObject *)so;
 }
-
-PyDoc_STRVAR(union_doc,
- "Return the union of sets as a new set.\n\
-\n\
-(i.e. all elements that are in either set.)");
 
 static PyObject *
 bitset_Bitset_or(bitset_BitsetObject *so, PyObject *other)
@@ -630,7 +728,7 @@ static PyNumberMethods bitset_as_number = {
 	(binaryfunc)bitset_Bitset_ior,	/* nb_inplace_or */
 };
 
-PyDoc_STRVAR(set_doc,
+PyDoc_STRVAR(bitset_Bitset_doc,
 "Bitset(iterable) --> Bitset object\n\
 \n\
 Build an unordered set of integers in the range [1,32].");
@@ -657,7 +755,7 @@ PyTypeObject bitset_BitsetType = {
     0,                             /* tp_setattro */
     0,                             /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT,            /* tp_flags */
-    "Bitset objects",              /* tp_doc */
+    bitset_Bitset_doc,             /* tp_doc */
 	0,                             /* tp_traverse */
     0,                             /* tp_clear */
     0,                             /* tp_richcompare */
