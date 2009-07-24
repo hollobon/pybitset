@@ -40,10 +40,43 @@ Bitset_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 Bitset_init(bitset_BitsetObject *self, PyObject *args, PyObject *kwds)
 {
-    static char *kwlist[] = {"number", NULL};
-
-    if (! PyArg_ParseTupleAndKeywords(args, kwds, "|I", kwlist, &self->bits))
+    int error = 0;
+    unsigned value;
+    PyObject *arg, *it, *key;
+    
+    if (!PyArg_ParseTuple(args, "|O", &arg))
         return -1;
+
+    if (PyInt_Check(arg)) {
+        self->bits = PyInt_AsLong(arg);
+    }
+    else {
+        it = PyObject_GetIter(arg);
+        if (it == NULL)
+            return -1;
+
+        while ((key = PyIter_Next(it)) != NULL) {
+            if (!PyInt_Check(key))
+                error = 1;
+
+            value = PyInt_AsLong(key);
+
+            if (value < 1 || value > 32)
+                error = 1;
+
+            if (error) {
+                PyErr_SetString(PyExc_TypeError, "bitsets can only contain integers [1..32]");
+                return -1;
+            }
+
+            self->bits |= 1 << (value - 1);        
+            Py_DECREF(key);
+        }
+        Py_DECREF(it);
+
+        if (PyErr_Occurred())
+            return -1;
+    }        
 
     return 0;
 }
