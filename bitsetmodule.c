@@ -111,9 +111,71 @@ bitset_Bitset_copy(bitset_BitsetObject *so)
 PyDoc_STRVAR(copy_doc, "Return a copy of a bitset.");
 
 static PyObject *
-Bitset_repr(bitset_BitsetObject * obj)
+Bitset_repr(bitset_BitsetObject *so)
 {
-    return PyString_FromFormat("bitset.Bitset(0x%x)", obj->bits);
+	PyObject *keys, *result=NULL, *listrepr;
+	int status = Py_ReprEnter((PyObject*)so);
+
+	if (status != 0) {
+		if (status < 0)
+			return NULL;
+		return PyString_FromFormat("%s(...)", so->ob_type->tp_name);
+	}
+
+	keys = PySequence_List((PyObject *)so);
+	if (keys == NULL)
+		goto done;
+	listrepr = PyObject_Repr(keys);
+	Py_DECREF(keys);
+	if (listrepr == NULL)
+		goto done;
+
+	result = PyString_FromFormat("%s(%s)", so->ob_type->tp_name,
+		PyString_AS_STRING(listrepr));
+	Py_DECREF(listrepr);
+done:
+	Py_ReprLeave((PyObject*)so);
+	return result;
+}
+
+int
+bitset_pop(unsigned int *bits)
+{
+    unsigned v = *bits;
+    unsigned int c;     // c will be the number of zero bits on the right,
+
+	if (*bits == 0) {
+        return 0;
+	}
+
+    /* http://graphics.stanford.edu/~seander/bithacks.html#ZerosOnRightBinSearch */
+    if (v & 0x1) {
+        // special case for odd v (assumed to happen half of the time)
+        c = 0;
+    }
+    else {
+        c = 1;
+        if ((v & 0xffff) == 0) {
+            v >>= 16;
+            c += 16;
+        }
+        if ((v & 0xff) == 0) {
+            v >>= 8;
+            c += 8;
+        }
+        if ((v & 0xf) == 0) {
+            v >>= 4;
+            c += 4;
+        }
+        if ((v & 0x3) == 0) {
+            v >>= 2;
+            c += 2;
+        }
+        c -= v & 0x1;
+    }
+
+    (*bits) &= ~0U - (1U << c);
+    return c + 1;
 }
 
 /***** Bitset iterator type ***********************************************/
@@ -121,8 +183,7 @@ Bitset_repr(bitset_BitsetObject * obj)
 typedef struct {
 	PyObject_HEAD
 	bitset_BitsetObject *bi_bitset; /* Set to NULL when iterator is exhausted */
-	Py_ssize_t bi_pos;
-	Py_ssize_t len;
+	unsigned int bi_state;
 } bitset_Bitset_iterobject;
 
 static void
@@ -140,17 +201,16 @@ static PyMethodDef bitset_Bitset_iter_methods[] = {
 static PyObject *bitset_Bitset_iter_iternext(bitset_Bitset_iterobject *bi)
 {
 	bitset_BitsetObject *so = bi->bi_bitset;
+    unsigned int v;
 
 	if (so == NULL)
 		return NULL;
 	assert (bitset_Bitset_Check(so));
 
-    for (;bi->bi_pos < 32; bi->bi_pos++) {
-        if (bi->bi_bitset->bits & (1 << bi->bi_pos)) {
-            bi->bi_pos++;
-            return PyInt_FromLong(bi->bi_pos);
-        }
-    }
+    v = bitset_pop(&(bi->bi_state));
+    if (v > 0)
+        return PyInt_FromLong(v);
+
 	Py_DECREF(so);
 	bi->bi_bitset = NULL;
 	return NULL;
@@ -199,7 +259,7 @@ bitset_Bitset_iter(bitset_BitsetObject *so)
 
 	Py_INCREF(so);
 	bi->bi_bitset = so;
-	bi->bi_pos = 0;
+	bi->bi_state = so->bits;
 
 	return (PyObject *)bi;
 }
@@ -335,43 +395,12 @@ If the element is not a member, do nothing.");
 static PyObject *
 bitset_Bitset_pop(bitset_BitsetObject *so)
 {
-    unsigned int v;
-    unsigned int c;     // c will be the number of zero bits on the right,
-
 	if (so->bits == 0) {
 		PyErr_SetString(PyExc_KeyError, "pop from an empty bitset");
 		return NULL;
 	}
 
-    /* http://graphics.stanford.edu/~seander/bithacks.html#ZerosOnRightBinSearch */
-    v = so->bits;
-    if (v & 0x1) {
-        // special case for odd v (assumed to happen half of the time)
-        c = 0;
-    }
-    else {
-        c = 1;
-        if ((v & 0xffff) == 0) {
-            v >>= 16;
-            c += 16;
-        }
-        if ((v & 0xff) == 0) {
-            v >>= 8;
-            c += 8;
-        }
-        if ((v & 0xf) == 0) {
-            v >>= 4;
-            c += 4;
-        }
-        if ((v & 0x3) == 0) {
-            v >>= 2;
-            c += 2;
-        }
-        c -= v & 0x1;
-    }
-
-    so->bits &= ~0U - (1U << c);
-    return PyInt_FromLong(c + 1);
+    return PyInt_FromLong(bitset_pop(&(so->bits)));
 }
 
 PyDoc_STRVAR(pop_doc, "Remove and return an arbitrary set element.");
