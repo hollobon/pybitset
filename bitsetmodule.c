@@ -2,7 +2,7 @@
  * Python bitset module.
  *
  * (C) Pete Hollobon <python@hollobon.com>
- * Derived from Objects/setobject.c from Python 2.5.4 / 2.6.2
+ * Based on Objects/setobject.c from Python 2.5.4 / 2.6.2
  *
  */
 
@@ -84,7 +84,7 @@ bitset_read_bits_from_sequence(PyObject *obj, unsigned int *bits)
 static int
 Bitset_init(bitset_BitsetObject *self, PyObject *args, PyObject *kwds)
 {
-    PyObject *arg;
+    PyObject *arg = PyInt_FromLong(0);
 
     if (!PyArg_ParseTuple(args, "|O", &arg))
         return -1;
@@ -92,9 +92,11 @@ Bitset_init(bitset_BitsetObject *self, PyObject *args, PyObject *kwds)
     if (PyInt_Check(arg)) {
         self->bits = PyInt_AsLong(arg);
     }
-    else {
-        if (bitset_read_bits_from_sequence(arg, &(self->bits)))
+    else if (PySequence_Check(arg)) {
+        if (bitset_read_bits_from_sequence(arg, &(self->bits))) {
+            self->bits = 0;
             return -1;
+        }
     }
 
     return 0;
@@ -218,35 +220,35 @@ static PyObject *bitset_Bitset_iter_iternext(bitset_Bitset_iterobject *bi)
 
 static PyTypeObject bitset_Bitset_iter_Type = {
     PyObject_HEAD_INIT(&PyType_Type)
-    0,                           /* ob_size */
-	"Bitset_iterator",              /* tp_name */
-	sizeof(bitset_Bitset_iterobject),      /* tp_basicsize */
-	0,                          /* tp_itemsize */
+    0,                                         /* ob_size */
+	"Bitset_iterator",                         /* tp_name */
+	sizeof(bitset_Bitset_iterobject),          /* tp_basicsize */
+	0,                                         /* tp_itemsize */
     /* methods */
-	(destructor)bitset_Bitset_iter_dealloc, /* tp_dealloc */
-	0,                          /* tp_print */
-	0,                          /* tp_getattr */
-	0,                          /* tp_setattr */
-	0,                          /* tp_compare */
-	0,                          /* tp_repr */
-	0,                          /* tp_as_number */
-	0,                          /* tp_as_sequence */
-	0,                          /* tp_as_mapping */
-	0,                          /* tp_hash */
-	0,                          /* tp_call */
-	0,                          /* tp_str */
-	PyObject_GenericGetAttr,    /* tp_getattro */
-	0,                          /* tp_setattro */
-	0,                          /* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT,         /* tp_flags */
- 	0,                          /* tp_doc */
- 	0,                          /* tp_traverse */
- 	0,                          /* tp_clear */
-	0,                          /* tp_richcompare */
-	0,                          /* tp_weaklistoffset */
-	PyObject_SelfIter,          /* tp_iter */
+	(destructor)bitset_Bitset_iter_dealloc,    /* tp_dealloc */
+	0,                                         /* tp_print */
+	0,                                         /* tp_getattr */
+	0,                                         /* tp_setattr */
+	0,                                         /* tp_compare */
+	0,                                         /* tp_repr */
+	0,                                         /* tp_as_number */
+	0,                                         /* tp_as_sequence */
+	0,                                         /* tp_as_mapping */
+	0,                                         /* tp_hash */
+	0,                                         /* tp_call */
+	0,                                         /* tp_str */
+	PyObject_GenericGetAttr,                   /* tp_getattro */
+	0,                                         /* tp_setattro */
+	0,                                         /* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,                        /* tp_flags */
+ 	0,                                         /* tp_doc */
+ 	0,                                         /* tp_traverse */
+ 	0,                                         /* tp_clear */
+	0,                                         /* tp_richcompare */
+	0,                                         /* tp_weaklistoffset */
+	PyObject_SelfIter,                         /* tp_iter */
 	(iternextfunc)bitset_Bitset_iter_iternext, /* tp_iternext */
-	bitset_Bitset_iter_methods,            /* tp_methods */
+	bitset_Bitset_iter_methods,                /* tp_methods */
 	0,
 };
 
@@ -349,19 +351,13 @@ PyDoc_STRVAR(update_doc,
 static PyObject *
 bitset_Bitset_remove(bitset_BitsetObject *so, PyObject *key)
 {
-    PyObject *tup;
-
     if (!PyInt_Check(key) || PyInt_AsLong(key) > 32) {
         PyErr_SetString(PyExc_TypeError, "bitsets can only contain integers [1..32]");
         return NULL;
     }
 
     if (!(so->bits & (1 << (PyInt_AsLong(key) - 1)))) {
-        tup = PyTuple_Pack(1, key);
-        if (!tup)
-            return NULL;
         PyErr_SetObject(PyExc_KeyError, key);
-        Py_DECREF(tup);
         return NULL;
     }
 
@@ -403,22 +399,22 @@ bitset_Bitset_pop(bitset_BitsetObject *so)
     return PyInt_FromLong(bitset_pop(&(so->bits)));
 }
 
-PyDoc_STRVAR(pop_doc, "Remove and return an arbitrary set element.");
+PyDoc_STRVAR(pop_doc, "Remove and return an arbitrary bitset element.");
 
 static PyObject *
 bitset_Bitset_issuperset(bitset_BitsetObject *so, PyObject *other)
 {
-/* 	if (!PyAnySet_Check(other)) { */
-/* 		tmp = make_new_set(&PySet_Type, other); */
-/* 		if (tmp == NULL) */
-/* 			return NULL; */
-/* 		result = set_issuperset(so, tmp); */
-/* 		Py_DECREF(tmp); */
-/* 		return result; */
-/* 	} */
+    unsigned int otherbits = 0;
 
-	if (((so->bits | ((bitset_BitsetObject *)other)->bits) == so->bits) && \
-        (so->bits >= ((bitset_BitsetObject *)other)->bits))
+    if (!bitset_Bitset_Check(other)) {
+        if (bitset_read_bits_from_sequence(other, &otherbits))
+            return NULL;
+    }
+    else {
+        otherbits = ((bitset_BitsetObject *)other)->bits;
+    }
+
+	if (((so->bits | otherbits) == so->bits) && (so->bits >= otherbits))
         Py_RETURN_TRUE;
 
     Py_RETURN_FALSE;
@@ -429,19 +425,23 @@ PyDoc_STRVAR(issuperset_doc, "Report whether this bitset contains another bitset
 static PyObject *
 bitset_Bitset_issubset(bitset_BitsetObject *so, PyObject *other)
 {
-/* 	if (!PyAnySet_Check(other)) { */
-/* 		tmp = make_new_set(&PySet_Type, other); */
-/* 		if (tmp == NULL) */
-/* 			return NULL; */
-/* 		result = set_issuperset(so, tmp); */
-/* 		Py_DECREF(tmp); */
-/* 		return result; */
-/* 	} */
+    unsigned int otherbits = 0;
 
-    return bitset_Bitset_issuperset((bitset_BitsetObject *)other, (PyObject *)so);
+    if (!bitset_Bitset_Check(other)) {
+        if (bitset_read_bits_from_sequence(other, &otherbits))
+            return NULL;
+    }
+    else {
+        otherbits = ((bitset_BitsetObject *)other)->bits;
+    }
+
+	if (((so->bits | otherbits) == otherbits) && (so->bits <= otherbits))
+        Py_RETURN_TRUE;
+
+    Py_RETURN_FALSE;
 }
 
-PyDoc_STRVAR(issubset_doc, "Report whether another set contains this set.");
+PyDoc_STRVAR(issubset_doc, "Report whether another bitset contains this bitset.");
 
 static PyObject *
 bitset_Bitset_isdisjoint(bitset_BitsetObject *bso, PyObject *other)
@@ -603,6 +603,38 @@ PyDoc_STRVAR(intersection_doc,
 \n\
 (i.e. all elements that are in both bitsets.)");
 
+static PyObject *
+bitset_Bitset_reduce(bitset_BitsetObject *so)
+{
+    PyObject *result, *args, *state;
+
+    args = PyTuple_New(0);
+
+    state = PyInt_FromLong(so->bits);
+    result = PyTuple_Pack(3, so->ob_type, args, state);
+
+    Py_XDECREF(args);
+    Py_XDECREF(state);
+    return result;
+}
+
+PyDoc_STRVAR(reduce_doc, "Return state information for pickling.");
+
+static PyObject *
+bitset_Bitset_setstate(bitset_BitsetObject *bso, PyObject *state)
+{
+    if (!PyInt_Check(state)) {
+		PyErr_SetString(PyExc_TypeError, "Invalid state in __setstate__");
+        return NULL;
+    }
+
+    bso->bits = PyInt_AsLong(state);
+
+    Py_RETURN_NONE;
+}
+
+PyDoc_STRVAR(setstate_doc, "Sets state information.");
+
 static PyMethodDef bitset_Bitset_methods[] = {
 	{"add",                         (PyCFunction)bitset_Bitset_add,
      METH_O, add_doc},
@@ -630,12 +662,12 @@ static PyMethodDef bitset_Bitset_methods[] = {
      METH_O, issuperset_doc},
 	{"pop",                         (PyCFunction)bitset_Bitset_pop,
      METH_NOARGS, pop_doc},
-/* 	{"__reduce__",                  (PyCFunction)bitset_Bitset_reduce, */
-/*      METH_NOARGS, reduce_doc}, */
+	{"__reduce__",                  (PyCFunction)bitset_Bitset_reduce,
+     METH_NOARGS, reduce_doc},
 	{"remove",                      (PyCFunction)bitset_Bitset_remove,
      METH_O, remove_doc},
-/*     {"__sizeof__",                  (PyCFunction)bitset_Bitset_sizeof,                       */
-/*      METH_NOARGS, sizeof_doc}, */
+	{"__setstate__",                (PyCFunction)bitset_Bitset_setstate,
+     METH_O, setstate_doc},
 	{"symmetric_difference",        (PyCFunction)bitset_Bitset_symmetric_difference,
      METH_O, symmetric_difference_doc},
 	{"symmetric_difference_update", (PyCFunction)bitset_Bitset_symmetric_difference_update,
@@ -807,6 +839,53 @@ static PyNumberMethods bitset_as_number = {
 	(binaryfunc)bitset_Bitset_ior,	/* nb_inplace_or */
 };
 
+static PyObject *
+bitset_Bitset_richcompare(bitset_BitsetObject *v, PyObject *w, int op)
+{
+	if (!bitset_Bitset_Check(w)) {
+		if (op == Py_EQ)
+			Py_RETURN_FALSE;
+		if (op == Py_NE)
+			Py_RETURN_TRUE;
+		PyErr_SetString(PyExc_TypeError, "can only compare to a bitset");
+
+		return NULL;
+	}
+    
+	switch (op) {
+	case Py_EQ:
+        if (v->bits == ((bitset_BitsetObject *)w)->bits)
+            Py_RETURN_TRUE;
+        Py_RETURN_FALSE;
+	case Py_NE:
+        if (v->bits != ((bitset_BitsetObject *)w)->bits)
+            Py_RETURN_TRUE;
+        Py_RETURN_FALSE;
+	case Py_LE:
+		return bitset_Bitset_issubset(v, w);
+	case Py_GE:
+		return bitset_Bitset_issuperset(v, w);
+	case Py_LT:
+        if (v->bits == ((bitset_BitsetObject *)w)->bits)
+            Py_RETURN_FALSE;
+		return bitset_Bitset_issubset(v, w);
+	case Py_GT:
+        if (v->bits == ((bitset_BitsetObject *)w)->bits)
+            Py_RETURN_FALSE;
+		return bitset_Bitset_issuperset(v, w);
+	}
+
+	Py_INCREF(Py_NotImplemented);
+	return Py_NotImplemented;
+}
+
+static int
+bitset_Bitset_nocmp(PyObject *self, PyObject *other)
+{
+	PyErr_SetString(PyExc_TypeError, "cannot compare bitsets using cmp()");
+	return -1;
+}
+
 PyDoc_STRVAR(bitset_Bitset_doc,
 "Bitset(iterable) --> Bitset object\n\
 \n\
@@ -814,44 +893,44 @@ Build an unordered set of integers in the range [1,32].");
 
 PyTypeObject bitset_BitsetType = {
     PyObject_HEAD_INIT(NULL)
-    0,                             /* ob_size */
-    "bitset.Bitset",               /* tp_name */
-    sizeof(bitset_BitsetObject),   /* tp_basicsize */
-    0,                             /* tp_itemsize */
-    (destructor)Bitset_dealloc,    /* tp_dealloc */
-    0,                             /* tp_print */
-    0,                             /* tp_getattr */
-    0,                             /* tp_setattr */
-    0,                             /* tp_compare */
-    (reprfunc)Bitset_repr,         /* tp_repr */
-    &bitset_as_number,             /* tp_as_number */
-	&bitset_as_sequence,           /* tp_as_sequence */
-    0,                             /* tp_as_mapping */
-    0,                             /* tp_hash */
-    0,                             /* tp_call */
-    0,                             /* tp_str */
-    0,                             /* tp_getattro */
-    0,                             /* tp_setattro */
-    0,                             /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT,            /* tp_flags */
-    bitset_Bitset_doc,             /* tp_doc */
-	0,                             /* tp_traverse */
-    0,                             /* tp_clear */
-    0,                             /* tp_richcompare */
-    0,                             /* tp_weaklistoffset */
-	(getiterfunc)bitset_Bitset_iter,    /* tp_iter */
-    0,                             /* tp_iternext */
-    bitset_Bitset_methods,         /* tp_methods */
-    0, // Bitset_members,          /* tp_members */
-    0,                             /* tp_getset */
-    0,                             /* tp_base */
-    0,                             /* tp_dict */
-    0,                             /* tp_descr_get */
-    0,                             /* tp_descr_set */
-    0,                             /* tp_dictoffset */
-    (initproc)Bitset_init,         /* tp_init */
-	0,                   		   /* tp_alloc */
-    Bitset_new,                    /* tp_new */
+    0,                                      /* ob_size */
+    "bitset.Bitset",                        /* tp_name */
+    sizeof(bitset_BitsetObject),            /* tp_basicsize */
+    0,                                      /* tp_itemsize */
+    (destructor)Bitset_dealloc,             /* tp_dealloc */
+    0,                                      /* tp_print */
+    0,                                      /* tp_getattr */
+    0,                                      /* tp_setattr */
+    bitset_Bitset_nocmp,                    /* tp_compare */
+    (reprfunc)Bitset_repr,                  /* tp_repr */
+    &bitset_as_number,                      /* tp_as_number */
+	&bitset_as_sequence,                    /* tp_as_sequence */
+    0,                                      /* tp_as_mapping */
+	(hashfunc)PyObject_HashNotImplemented,	/* tp_hash */
+    0,                                      /* tp_call */
+    0,                                      /* tp_str */
+    0,                                      /* tp_getattro */
+    0,                                      /* tp_setattro */
+    0,                                      /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                     /* tp_flags */
+    bitset_Bitset_doc,                      /* tp_doc */
+	0,                                      /* tp_traverse */
+    0,                                      /* tp_clear */
+    (richcmpfunc)bitset_Bitset_richcompare, /* tp_richcompare */
+    0,                                      /* tp_weaklistoffset */
+	(getiterfunc)bitset_Bitset_iter,        /* tp_iter */
+    0,                                      /* tp_iternext */
+    bitset_Bitset_methods,                  /* tp_methods */
+    0,                                      /* tp_members */
+    0,                                      /* tp_getset */
+    0,                                      /* tp_base */
+    0,                                      /* tp_dict */
+    0,                                      /* tp_descr_get */
+    0,                                      /* tp_descr_set */
+    0,                                      /* tp_dictoffset */
+    (initproc)Bitset_init,                  /* tp_init */
+	0,                                      /* tp_alloc */
+    Bitset_new,                             /* tp_new */
 };
 
 #ifndef PyMODINIT_FUNC	/* declarations for DLL import/export */
