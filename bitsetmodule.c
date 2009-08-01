@@ -701,6 +701,8 @@ bitset_Bitset_isub(bitset_BitsetObject *bso, PyObject *other)
 	}
 
     bitset_Bitset_difference_update(bso, other);
+
+    Py_INCREF(bso);
     return (PyObject *)bso;
 }
 
@@ -733,6 +735,7 @@ bitset_Bitset_iand(bitset_BitsetObject *bso, PyObject *other)
 
     bso->bits &= ((bitset_BitsetObject *)other)->bits;
 
+    Py_INCREF(bso);
     return (PyObject *)bso;
 }
 
@@ -765,6 +768,7 @@ bitset_Bitset_ixor(bitset_BitsetObject *bso, PyObject *other)
 
     bso->bits ^= ((bitset_BitsetObject *)other)->bits;
 
+    Py_INCREF(bso);
 	return (PyObject *)bso;
 }
 
@@ -797,6 +801,7 @@ bitset_Bitset_ior(bitset_BitsetObject *bso, PyObject *other)
 
     bso->bits |= ((bitset_BitsetObject *)other)->bits;
 
+    Py_INCREF(bso);
 	return (PyObject *)bso;
 }
 
