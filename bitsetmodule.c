@@ -285,7 +285,7 @@ bitset_contains(bitset_BitsetObject *bso, PyObject *key)
         return -1;
     }
 
-    return bso->bits & (1 << (PyInt_AsLong(key) - 1));
+    return (bso->bits & (1 << (PyInt_AsLong(key) - 1))) != 0;
 }
 
 static PyMethodDef bitset_methods[] = {
