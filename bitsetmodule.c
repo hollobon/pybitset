@@ -103,28 +103,28 @@ Bitset_init(bitset_BitsetObject *self, PyObject *args, PyObject *kwds)
 }
 
 static PyObject *
-bitset_Bitset_copy(bitset_BitsetObject *so)
+bitset_Bitset_copy(bitset_BitsetObject *bso)
 {
 	bitset_BitsetObject *result = (bitset_BitsetObject *)Bitset_new(&bitset_BitsetType, NULL, NULL);
-    result->bits = so->bits;
+    result->bits = bso->bits;
     return (PyObject *)result;
 }
 
 PyDoc_STRVAR(copy_doc, "Return a copy of a bitset.");
 
 static PyObject *
-Bitset_repr(bitset_BitsetObject *so)
+Bitset_repr(bitset_BitsetObject *bso)
 {
 	PyObject *keys, *result=NULL, *listrepr;
-	int status = Py_ReprEnter((PyObject*)so);
+	int status = Py_ReprEnter((PyObject*)bso);
 
 	if (status != 0) {
 		if (status < 0)
 			return NULL;
-		return PyString_FromFormat("%s(...)", so->ob_type->tp_name);
+		return PyString_FromFormat("%s(...)", bso->ob_type->tp_name);
 	}
 
-	keys = PySequence_List((PyObject *)so);
+	keys = PySequence_List((PyObject *)bso);
 	if (keys == NULL)
 		goto done;
 	listrepr = PyObject_Repr(keys);
@@ -132,11 +132,11 @@ Bitset_repr(bitset_BitsetObject *so)
 	if (listrepr == NULL)
 		goto done;
 
-	result = PyString_FromFormat("%s(%s)", so->ob_type->tp_name,
+	result = PyString_FromFormat("%s(%s)", bso->ob_type->tp_name,
 		PyString_AS_STRING(listrepr));
 	Py_DECREF(listrepr);
 done:
-	Py_ReprLeave((PyObject*)so);
+	Py_ReprLeave((PyObject*)bso);
 	return result;
 }
 
@@ -202,18 +202,18 @@ static PyMethodDef bitset_Bitset_iter_methods[] = {
 
 static PyObject *bitset_Bitset_iter_iternext(bitset_Bitset_iterobject *bi)
 {
-	bitset_BitsetObject *so = bi->bi_bitset;
+	bitset_BitsetObject *bso = bi->bi_bitset;
     unsigned int v;
 
-	if (so == NULL)
+	if (bso == NULL)
 		return NULL;
-	assert (bitset_Bitset_Check(so));
+	assert (bitset_Bitset_Check(bso));
 
     v = bitset_pop(&(bi->bi_state));
     if (v > 0)
         return PyInt_FromLong(v);
 
-	Py_DECREF(so);
+	Py_DECREF(bso);
 	bi->bi_bitset = NULL;
 	return NULL;
 }
@@ -253,15 +253,15 @@ static PyTypeObject bitset_Bitset_iter_Type = {
 };
 
 static PyObject *
-bitset_Bitset_iter(bitset_BitsetObject *so)
+bitset_Bitset_iter(bitset_BitsetObject *bso)
 {
 	bitset_Bitset_iterobject *bi = PyObject_GC_New(bitset_Bitset_iterobject, &bitset_Bitset_iter_Type);
 	if (bi == NULL)
 		return NULL;
 
-	Py_INCREF(so);
-	bi->bi_bitset = so;
-	bi->bi_state = so->bits;
+	Py_INCREF(bso);
+	bi->bi_bitset = bso;
+	bi->bi_state = bso->bits;
 
 	return (PyObject *)bi;
 }
@@ -306,14 +306,14 @@ static PySequenceMethods bitset_as_sequence = {
 };
 
 static PyObject *
-bitset_Bitset_add(bitset_BitsetObject *so, PyObject *key)
+bitset_Bitset_add(bitset_BitsetObject *bso, PyObject *key)
 {
     if (!PyInt_Check(key) || PyInt_AsLong(key) > 32) {
         PyErr_SetString(PyExc_TypeError, "bitsets can only contain integers [1..32]");
         return NULL;
     }
 
-    so->bits |= 1 << (PyInt_AsLong(key) - 1);
+    bso->bits |= 1 << (PyInt_AsLong(key) - 1);
 	Py_RETURN_NONE;
 }
 
@@ -323,23 +323,23 @@ PyDoc_STRVAR(add_doc,
 This has no effect if the element is already present.");
 
 static PyObject *
-bitset_Bitset_clear(bitset_BitsetObject *so)
+bitset_Bitset_clear(bitset_BitsetObject *bso)
 {
-    so->bits = 0;
+    bso->bits = 0;
 	Py_RETURN_NONE;
 }
 
 PyDoc_STRVAR(clear_doc, "Remove all elements from this Bitset.");
 
 static PyObject *
-bitset_Bitset_update(bitset_BitsetObject *so, PyObject *other)
+bitset_Bitset_update(bitset_BitsetObject *bso, PyObject *other)
 {
 	if (bitset_Bitset_Check(other)) {
-		so->bits |= ((bitset_BitsetObject *)other)->bits;
+		bso->bits |= ((bitset_BitsetObject *)other)->bits;
         Py_RETURN_NONE;
     }
 
-    if (bitset_read_bits_from_sequence(other, &(so->bits)))
+    if (bitset_read_bits_from_sequence(other, &(bso->bits)))
         return NULL;
 
 	Py_RETURN_NONE;
@@ -349,19 +349,19 @@ PyDoc_STRVAR(update_doc,
 "Update a bitset with the union of itself and another.");
 
 static PyObject *
-bitset_Bitset_remove(bitset_BitsetObject *so, PyObject *key)
+bitset_Bitset_remove(bitset_BitsetObject *bso, PyObject *key)
 {
     if (!PyInt_Check(key) || PyInt_AsLong(key) > 32) {
         PyErr_SetString(PyExc_TypeError, "bitsets can only contain integers [1..32]");
         return NULL;
     }
 
-    if (!(so->bits & (1 << (PyInt_AsLong(key) - 1)))) {
+    if (!(bso->bits & (1 << (PyInt_AsLong(key) - 1)))) {
         PyErr_SetObject(PyExc_KeyError, key);
         return NULL;
     }
 
-    ((bitset_BitsetObject *)so)->bits &= (~0U - (1 << (PyInt_AsLong(key) - 1)));
+    ((bitset_BitsetObject *)bso)->bits &= (~0U - (1 << (PyInt_AsLong(key) - 1)));
 	Py_RETURN_NONE;
 }
 
@@ -372,14 +372,14 @@ If the element is not a member, raise a KeyError.");
 
 
 static PyObject *
-bitset_Bitset_discard(bitset_BitsetObject *so, PyObject *key)
+bitset_Bitset_discard(bitset_BitsetObject *bso, PyObject *key)
 {
     if (!PyInt_Check(key) || PyInt_AsLong(key) > 32) {
         PyErr_SetString(PyExc_TypeError, "bitsets can only contain integers [1..32]");
         return NULL;
     }
 
-    so->bits &= (~0U - (1 << (PyInt_AsLong(key) - 1)));
+    bso->bits &= (~0U - (1 << (PyInt_AsLong(key) - 1)));
 	Py_RETURN_NONE;
 }
 
@@ -389,20 +389,20 @@ PyDoc_STRVAR(discard_doc,
 If the element is not a member, do nothing.");
 
 static PyObject *
-bitset_Bitset_pop(bitset_BitsetObject *so)
+bitset_Bitset_pop(bitset_BitsetObject *bso)
 {
-	if (so->bits == 0) {
+	if (bso->bits == 0) {
 		PyErr_SetString(PyExc_KeyError, "pop from an empty bitset");
 		return NULL;
 	}
 
-    return PyInt_FromLong(bitset_pop(&(so->bits)));
+    return PyInt_FromLong(bitset_pop(&(bso->bits)));
 }
 
 PyDoc_STRVAR(pop_doc, "Remove and return an arbitrary bitset element.");
 
 static PyObject *
-bitset_Bitset_issuperset(bitset_BitsetObject *so, PyObject *other)
+bitset_Bitset_issuperset(bitset_BitsetObject *bso, PyObject *other)
 {
     unsigned int otherbits = 0;
 
@@ -414,7 +414,7 @@ bitset_Bitset_issuperset(bitset_BitsetObject *so, PyObject *other)
         otherbits = ((bitset_BitsetObject *)other)->bits;
     }
 
-	if (((so->bits | otherbits) == so->bits) && (so->bits >= otherbits))
+	if (((bso->bits | otherbits) == bso->bits) && (bso->bits >= otherbits))
         Py_RETURN_TRUE;
 
     Py_RETURN_FALSE;
@@ -423,7 +423,7 @@ bitset_Bitset_issuperset(bitset_BitsetObject *so, PyObject *other)
 PyDoc_STRVAR(issuperset_doc, "Report whether this bitset contains another bitset.");
 
 static PyObject *
-bitset_Bitset_issubset(bitset_BitsetObject *so, PyObject *other)
+bitset_Bitset_issubset(bitset_BitsetObject *bso, PyObject *other)
 {
     unsigned int otherbits = 0;
 
@@ -435,7 +435,7 @@ bitset_Bitset_issubset(bitset_BitsetObject *so, PyObject *other)
         otherbits = ((bitset_BitsetObject *)other)->bits;
     }
 
-	if (((so->bits | otherbits) == otherbits) && (so->bits <= otherbits))
+	if (((bso->bits | otherbits) == otherbits) && (bso->bits <= otherbits))
         Py_RETURN_TRUE;
 
     Py_RETURN_FALSE;
@@ -540,11 +540,11 @@ PyDoc_STRVAR(symmetric_difference_doc,
 (i.e. all elements that are in exactly one of the bitsets.)");
 
 static PyObject *
-bitset_Bitset_union(bitset_BitsetObject *so, PyObject *other)
+bitset_Bitset_union(bitset_BitsetObject *bso, PyObject *other)
 {
 	bitset_BitsetObject *result;
 
-	result = (bitset_BitsetObject *)bitset_Bitset_copy(so);
+	result = (bitset_BitsetObject *)bitset_Bitset_copy(bso);
 	if (result == NULL)
 		return NULL;
 
@@ -562,19 +562,19 @@ PyDoc_STRVAR(union_doc,
 (i.e. all elements that are in either bitset.)");
 
 static PyObject *
-bitset_Bitset_intersection_update(bitset_BitsetObject *so, PyObject *other)
+bitset_Bitset_intersection_update(bitset_BitsetObject *bso, PyObject *other)
 {
     unsigned int otherbits = 0;
 
 	if (bitset_Bitset_Check(other)) {
-		so->bits &= ((bitset_BitsetObject *)other)->bits;
+		bso->bits &= ((bitset_BitsetObject *)other)->bits;
         Py_RETURN_NONE;
     }
 
     if (bitset_read_bits_from_sequence(other, &otherbits))
         return NULL;
 
-    so->bits &= otherbits;
+    bso->bits &= otherbits;
 	Py_RETURN_NONE;
 }
 
@@ -582,11 +582,11 @@ PyDoc_STRVAR(intersection_update_doc,
 "Update a bitset with the intersection of itself and another.");
 
 static PyObject *
-bitset_Bitset_intersection(bitset_BitsetObject *so, PyObject *other)
+bitset_Bitset_intersection(bitset_BitsetObject *bso, PyObject *other)
 {
 	bitset_BitsetObject *result;
 
-	result = (bitset_BitsetObject *)bitset_Bitset_copy(so);
+	result = (bitset_BitsetObject *)bitset_Bitset_copy(bso);
 	if (result == NULL)
 		return NULL;
 
@@ -604,14 +604,14 @@ PyDoc_STRVAR(intersection_doc,
 (i.e. all elements that are in both bitsets.)");
 
 static PyObject *
-bitset_Bitset_reduce(bitset_BitsetObject *so)
+bitset_Bitset_reduce(bitset_BitsetObject *bso)
 {
     PyObject *result, *args, *state;
 
     args = PyTuple_New(0);
 
-    state = PyInt_FromLong(so->bits);
-    result = PyTuple_Pack(3, so->ob_type, args, state);
+    state = PyInt_FromLong(bso->bits);
+    result = PyTuple_Pack(3, bso->ob_type, args, state);
 
     Py_XDECREF(args);
     Py_XDECREF(state);
@@ -684,39 +684,39 @@ static PyMethodDef bitset_Bitset_methods[] = {
 };
 
 static PyObject *
-bitset_Bitset_sub(bitset_BitsetObject *so, PyObject *other)
+bitset_Bitset_sub(bitset_BitsetObject *bso, PyObject *other)
 {
-	if (!bitset_Bitset_Check(so) || !bitset_Bitset_Check(other)) {
+	if (!bitset_Bitset_Check(bso) || !bitset_Bitset_Check(other)) {
 		Py_INCREF(Py_NotImplemented);
 		return Py_NotImplemented;
 	}
 
-	return bitset_Bitset_difference(so, other);
+	return bitset_Bitset_difference(bso, other);
 }
 
 static PyObject *
-bitset_Bitset_isub(bitset_BitsetObject *so, PyObject *other)
+bitset_Bitset_isub(bitset_BitsetObject *bso, PyObject *other)
 {
-	if (!bitset_Bitset_Check(so) || !bitset_Bitset_Check(other)) {
+	if (!bitset_Bitset_Check(bso) || !bitset_Bitset_Check(other)) {
 		Py_INCREF(Py_NotImplemented);
 		return Py_NotImplemented;
 	}
 
-    bitset_Bitset_difference_update(so, other);
-    return (PyObject *)so;
+    bitset_Bitset_difference_update(bso, other);
+    return (PyObject *)bso;
 }
 
 static PyObject *
-bitset_Bitset_and(bitset_BitsetObject *so, PyObject *other)
+bitset_Bitset_and(bitset_BitsetObject *bso, PyObject *other)
 {
 	bitset_BitsetObject *result;
 
-	if (!bitset_Bitset_Check(so) || !bitset_Bitset_Check(other)) {
+	if (!bitset_Bitset_Check(bso) || !bitset_Bitset_Check(other)) {
 		Py_INCREF(Py_NotImplemented);
 		return Py_NotImplemented;
 	}
 
-	result = (bitset_BitsetObject *)bitset_Bitset_copy(so);
+	result = (bitset_BitsetObject *)bitset_Bitset_copy(bso);
 	if (result == NULL)
 		return NULL;
 
@@ -726,29 +726,29 @@ bitset_Bitset_and(bitset_BitsetObject *so, PyObject *other)
 }
 
 static PyObject *
-bitset_Bitset_iand(bitset_BitsetObject *so, PyObject *other)
+bitset_Bitset_iand(bitset_BitsetObject *bso, PyObject *other)
 {
-	if (!bitset_Bitset_Check(so) || !bitset_Bitset_Check(other)) {
+	if (!bitset_Bitset_Check(bso) || !bitset_Bitset_Check(other)) {
 		Py_INCREF(Py_NotImplemented);
 		return Py_NotImplemented;
 	}
 
-    so->bits &= ((bitset_BitsetObject *)other)->bits;
+    bso->bits &= ((bitset_BitsetObject *)other)->bits;
 
-    return (PyObject *)so;
+    return (PyObject *)bso;
 }
 
 static PyObject *
-bitset_Bitset_xor(bitset_BitsetObject *so, PyObject *other)
+bitset_Bitset_xor(bitset_BitsetObject *bso, PyObject *other)
 {
 	bitset_BitsetObject *result;
 
-	if (!bitset_Bitset_Check(so) || !bitset_Bitset_Check(other)) {
+	if (!bitset_Bitset_Check(bso) || !bitset_Bitset_Check(other)) {
 		Py_INCREF(Py_NotImplemented);
 		return Py_NotImplemented;
 	}
 
-	result = (bitset_BitsetObject *)bitset_Bitset_copy(so);
+	result = (bitset_BitsetObject *)bitset_Bitset_copy(bso);
 	if (result == NULL)
 		return NULL;
 
@@ -758,29 +758,29 @@ bitset_Bitset_xor(bitset_BitsetObject *so, PyObject *other)
 }
 
 static PyObject *
-bitset_Bitset_ixor(bitset_BitsetObject *so, PyObject *other)
+bitset_Bitset_ixor(bitset_BitsetObject *bso, PyObject *other)
 {
-	if (!bitset_Bitset_Check(so) || !bitset_Bitset_Check(other)) {
+	if (!bitset_Bitset_Check(bso) || !bitset_Bitset_Check(other)) {
 		Py_INCREF(Py_NotImplemented);
 		return Py_NotImplemented;
 	}
 
-    so->bits ^= ((bitset_BitsetObject *)other)->bits;
+    bso->bits ^= ((bitset_BitsetObject *)other)->bits;
 
-	return (PyObject *)so;
+	return (PyObject *)bso;
 }
 
 static PyObject *
-bitset_Bitset_or(bitset_BitsetObject *so, PyObject *other)
+bitset_Bitset_or(bitset_BitsetObject *bso, PyObject *other)
 {
 	bitset_BitsetObject *result;
 
-	if (!bitset_Bitset_Check(so) || !bitset_Bitset_Check(other)) {
+	if (!bitset_Bitset_Check(bso) || !bitset_Bitset_Check(other)) {
 		Py_INCREF(Py_NotImplemented);
 		return Py_NotImplemented;
 	}
 
-	result = (bitset_BitsetObject *)bitset_Bitset_copy(so);
+	result = (bitset_BitsetObject *)bitset_Bitset_copy(bso);
 	if (result == NULL)
 		return NULL;
 
@@ -790,16 +790,16 @@ bitset_Bitset_or(bitset_BitsetObject *so, PyObject *other)
 }
 
 static PyObject *
-bitset_Bitset_ior(bitset_BitsetObject *so, PyObject *other)
+bitset_Bitset_ior(bitset_BitsetObject *bso, PyObject *other)
 {
-	if (!bitset_Bitset_Check(so) || !bitset_Bitset_Check(other)) {
+	if (!bitset_Bitset_Check(bso) || !bitset_Bitset_Check(other)) {
 		Py_INCREF(Py_NotImplemented);
 		return Py_NotImplemented;
 	}
 
-    so->bits |= ((bitset_BitsetObject *)other)->bits;
+    bso->bits |= ((bitset_BitsetObject *)other)->bits;
 
-	return (PyObject *)so;
+	return (PyObject *)bso;
 }
 
 static PyNumberMethods bitset_as_number = {
