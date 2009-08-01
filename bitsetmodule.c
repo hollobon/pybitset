@@ -84,19 +84,17 @@ bitset_read_bits_from_sequence(PyObject *obj, unsigned int *bits)
 static int
 Bitset_init(bitset_BitsetObject *self, PyObject *args, PyObject *kwds)
 {
-    PyObject *arg = PyInt_FromLong(0);
+    PyObject *arg = NULL;
 
     if (!PyArg_ParseTuple(args, "|O", &arg))
         return -1;
 
-    if (PyInt_Check(arg)) {
-        self->bits = PyInt_AsLong(arg);
-    }
-    else if (PySequence_Check(arg)) {
-        if (bitset_read_bits_from_sequence(arg, &(self->bits))) {
-            self->bits = 0;
-            return -1;
-        }
+    if (arg == NULL)
+        return 0;
+
+    if (bitset_read_bits_from_sequence(arg, &(self->bits))) {
+        self->bits = 0;
+        return -1;
     }
 
     return 0;
@@ -857,21 +855,22 @@ bitset_Bitset_richcompare(bitset_BitsetObject *v, PyObject *w, int op)
         if (v->bits == ((bitset_BitsetObject *)w)->bits)
             Py_RETURN_TRUE;
         Py_RETURN_FALSE;
+
 	case Py_NE:
         if (v->bits != ((bitset_BitsetObject *)w)->bits)
             Py_RETURN_TRUE;
         Py_RETURN_FALSE;
-	case Py_LE:
-		return bitset_Bitset_issubset(v, w);
-	case Py_GE:
-		return bitset_Bitset_issuperset(v, w);
+
 	case Py_LT:
         if (v->bits == ((bitset_BitsetObject *)w)->bits)
             Py_RETURN_FALSE;
+	case Py_LE:
 		return bitset_Bitset_issubset(v, w);
+
 	case Py_GT:
         if (v->bits == ((bitset_BitsetObject *)w)->bits)
             Py_RETURN_FALSE;
+	case Py_GE:
 		return bitset_Bitset_issuperset(v, w);
 	}
 
