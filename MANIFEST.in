@@ -1,0 +1,6 @@
+graft tests
+
+global-exclude *~
+global-exclude .git
+global-exclude *.pyc
+global-exclude *.pyo
