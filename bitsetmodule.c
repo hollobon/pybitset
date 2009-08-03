@@ -81,63 +81,7 @@ bitset_read_bits_from_sequence(PyObject *obj, unsigned int *bits)
     return 0;
 }
 
-static int
-Bitset_init(bitset_BitsetObject *self, PyObject *args, PyObject *kwds)
-{
-    PyObject *arg = NULL;
-
-    if (!PyArg_ParseTuple(args, "|O", &arg))
-        return -1;
-
-    if (arg == NULL)
-        return 0;
-
-    if (bitset_read_bits_from_sequence(arg, &(self->bits))) {
-        self->bits = 0;
-        return -1;
-    }
-
-    return 0;
-}
-
-static PyObject *
-bitset_Bitset_copy(bitset_BitsetObject *bso)
-{
-    bitset_BitsetObject *result = (bitset_BitsetObject *)Bitset_new(&bitset_BitsetType, NULL, NULL);
-    result->bits = bso->bits;
-    return (PyObject *)result;
-}
-
-PyDoc_STRVAR(copy_doc, "Return a copy of a bitset.");
-
-static PyObject *
-Bitset_repr(bitset_BitsetObject *bso)
-{
-    PyObject *keys, *result=NULL, *listrepr;
-    int status = Py_ReprEnter((PyObject*)bso);
-
-    if (status != 0) {
-        if (status < 0)
-            return NULL;
-        return PyString_FromFormat("%s(...)", bso->ob_type->tp_name);
-    }
-
-    keys = PySequence_List((PyObject *)bso);
-    if (keys == NULL)
-        goto done;
-    listrepr = PyObject_Repr(keys);
-    Py_DECREF(keys);
-    if (listrepr == NULL)
-        goto done;
-
-    result = PyString_FromFormat("%s(%s)", bso->ob_type->tp_name,
-        PyString_AS_STRING(listrepr));
-    Py_DECREF(listrepr);
-done:
-    Py_ReprLeave((PyObject*)bso);
-    return result;
-}
-
+/* Returns the position of the rightmost unset bit in *bits, and unsets that bit */
 int
 bitset_pop(unsigned int *bits)
 {
@@ -177,6 +121,16 @@ bitset_pop(unsigned int *bits)
     (*bits) &= ~0U - (1U << c);
     return c + 1;
 }
+
+static PyObject *
+bitset_Bitset_copy(bitset_BitsetObject *bso)
+{
+    bitset_BitsetObject *result = (bitset_BitsetObject *)Bitset_new(&bitset_BitsetType, NULL, NULL);
+    result->bits = bso->bits;
+    return (PyObject *)result;
+}
+
+PyDoc_STRVAR(copy_doc, "Return a copy of a bitset.");
 
 /***** Bitset iterator type ***********************************************/
 
@@ -264,8 +218,10 @@ bitset_Bitset_iter(bitset_BitsetObject *bso)
     return (PyObject *)bi;
 }
 
+/***** Sequence methods *****/
+
 static Py_ssize_t
-bitset_len(PyObject *bso)
+bitset_Bitset_len(PyObject *bso)
 {
     unsigned int c;
     unsigned int v = ((bitset_BitsetObject *)bso)->bits;
@@ -278,7 +234,7 @@ bitset_len(PyObject *bso)
 }
 
 static int
-bitset_contains(bitset_BitsetObject *bso, PyObject *key)
+bitset_Bitset_contains(bitset_BitsetObject *bso, PyObject *key)
 {
     if (!PyInt_Check(key)) {
         PyErr_SetString(PyExc_TypeError, "bitsets can only contain integers [1..32]");
@@ -293,15 +249,17 @@ static PyMethodDef bitset_methods[] = {
 };
 
 static PySequenceMethods bitset_as_sequence = {
-    bitset_len,                  /* sq_length */
-    0,                           /* sq_concat */
-    0,                           /* sq_repeat */
-    0,                           /* sq_item */
-    0,                           /* sq_slice */
-    0,                           /* sq_ass_item */
-    0,                           /* sq_ass_slice */
-    (objobjproc)bitset_contains, /* sq_contains */
+    bitset_Bitset_len,                  /* sq_length */
+    0,                                  /* sq_concat */
+    0,                                  /* sq_repeat */
+    0,                                  /* sq_item */
+    0,                                  /* sq_slice */
+    0,                                  /* sq_ass_item */
+    0,                                  /* sq_ass_slice */
+    (objobjproc)bitset_Bitset_contains, /* sq_contains */
 };
+
+/***** bitset methods *****/
 
 static PyObject *
 bitset_Bitset_add(bitset_BitsetObject *bso, PyObject *key)
@@ -681,6 +639,8 @@ static PyMethodDef bitset_Bitset_methods[] = {
     {NULL,        NULL}                /* sentinel */
 };
 
+/***** number methods *****/
+
 static PyObject *
 bitset_Bitset_sub(bitset_BitsetObject *bso, PyObject *other)
 {
@@ -842,6 +802,53 @@ static PyNumberMethods bitset_as_number = {
     (binaryfunc)bitset_Bitset_ior,    /* nb_inplace_or */
 };
 
+static int
+Bitset_init(bitset_BitsetObject *self, PyObject *args, PyObject *kwds)
+{
+    PyObject *arg = NULL;
+
+    if (!PyArg_ParseTuple(args, "|O", &arg))
+        return -1;
+
+    if (arg == NULL)
+        return 0;
+
+    if (bitset_read_bits_from_sequence(arg, &(self->bits))) {
+        self->bits = 0;
+        return -1;
+    }
+
+    return 0;
+}
+
+static PyObject *
+Bitset_repr(bitset_BitsetObject *bso)
+{
+    PyObject *keys, *result=NULL, *listrepr;
+    int status = Py_ReprEnter((PyObject*)bso);
+
+    if (status != 0) {
+        if (status < 0)
+            return NULL;
+        return PyString_FromFormat("%s(...)", bso->ob_type->tp_name);
+    }
+
+    keys = PySequence_List((PyObject *)bso);
+    if (keys == NULL)
+        goto done;
+    listrepr = PyObject_Repr(keys);
+    Py_DECREF(keys);
+    if (listrepr == NULL)
+        goto done;
+
+    result = PyString_FromFormat("%s(%s)", bso->ob_type->tp_name,
+        PyString_AS_STRING(listrepr));
+    Py_DECREF(listrepr);
+done:
+    Py_ReprLeave((PyObject*)bso);
+    return result;
+}
+
 static PyObject *
 bitset_Bitset_richcompare(bitset_BitsetObject *v, PyObject *w, int op)
 {
@@ -910,7 +917,7 @@ PyTypeObject bitset_BitsetType = {
     &bitset_as_number,                      /* tp_as_number */
     &bitset_as_sequence,                    /* tp_as_sequence */
     0,                                      /* tp_as_mapping */
-    (hashfunc)PyObject_HashNotImplemented,    /* tp_hash */
+    (hashfunc)PyObject_HashNotImplemented,  /* tp_hash */
     0,                                      /* tp_call */
     0,                                      /* tp_str */
     0,                                      /* tp_getattro */
