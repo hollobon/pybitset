@@ -1,0 +1,24 @@
+pybitset
+========
+
+Copyright (c) 2009 Pete Hollobon <python at hollobon.com>
+
+Based on Objects/setobject.c in the Python distribution.
+
+
+Pybitset provides a Python extension module (bitset) which implements
+a fast, small set class (Bitset) for integers in the range [1..32]. A
+32 bit integer is used internally to store the set, allowing bitwise
+operators to be used for the usual set operations, in constant time.
+
+Most operations are appreciably faster than using Python's built in set.
+
+All the methods and operators provided by set are implemented, with
+the obvious caveat that they can only handle other Bitsets or
+iterables yielding integers 1 <= x <= 32.
+
+It requires Python 2.6 or higher.
+
+Installation:
+
+python ./setup.py install

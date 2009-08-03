@@ -1,0 +1,4 @@
+README
+bitsetmodule.c
+setup.py
+tests/bitset_test.py
